@@ -18,6 +18,7 @@ class GmailClient:
     """Client for interacting with Gmail API."""
     
     SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+    MAX_BODY_LENGTH = 5000  # Maximum body length to avoid token limits
     
     def __init__(self):
         """Initialize Gmail API client."""
@@ -178,4 +179,4 @@ class GmailClient:
                 payload['body']['data']
             ).decode('utf-8')
         
-        return body[:5000]  # Limit body size to avoid token limits
+        return body[:self.MAX_BODY_LENGTH]

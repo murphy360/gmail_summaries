@@ -31,7 +31,7 @@ EXPOSE 5000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:5000/health')"
+    CMD python -c "import requests; exit(0 if requests.get('http://localhost:5000/health', timeout=5).status_code == 200 else 1)"
 
 # Run the application with gunicorn
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "app:app"]

@@ -115,7 +115,8 @@ def summarize_emails():
 
 
 def filter_emails_by_topic(emails, topic):
-    """Filter emails by topic keywords."""
+    """Filter emails by topic keywords with word boundary matching."""
+    import re
     topic_keywords = topic.lower().split()
     filtered = []
     
@@ -124,9 +125,13 @@ def filter_emails_by_topic(emails, topic):
         snippet = email.get('snippet', '').lower()
         body = email.get('body', '').lower()
         
-        # Check if any keyword is in subject, snippet, or body
+        # Check if any keyword is in subject, snippet, or body using word boundaries
         for keyword in topic_keywords:
-            if keyword in subject or keyword in snippet or keyword in body:
+            # Use word boundary regex for more accurate matching
+            pattern = r'\b' + re.escape(keyword) + r'\b'
+            if (re.search(pattern, subject) or 
+                re.search(pattern, snippet) or 
+                re.search(pattern, body)):
                 filtered.append(email)
                 break
     
