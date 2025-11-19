@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  gmail-summaries:
+    build: .
+    container_name: gmail-summaries
+    ports:
+      - "5000:5000"
+    environment:
+      # Gemini API Key (required)
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      
+      # Gmail Authentication - Option 1: Service Account File
+      - GOOGLE_SERVICE_ACCOUNT_FILE=${GOOGLE_SERVICE_ACCOUNT_FILE:-/app/credentials/service-account.json}
+      
+      # Gmail Authentication - Option 2: Service Account JSON as environment variable
+      # - GOOGLE_CREDENTIALS_JSON=${GOOGLE_CREDENTIALS_JSON}
+      
+      # Optional: For domain-wide delegation
+      # - GMAIL_DELEGATED_USER=${GMAIL_DELEGATED_USER}
+      
+      # Application settings
+      - PORT=5000
+    volumes:
+      # Mount credentials directory (if using service account file)
+      - ${CREDENTIALS_PATH:-./credentials}:/app/credentials:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; exit(0 if requests.get('http://localhost:5000/health', timeout=5).status_code == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - gmail-summaries-network
+
+networks:
+  gmail-summaries-network:
+    driver: bridge

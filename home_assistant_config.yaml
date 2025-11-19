@@ -1,0 +1,163 @@
+# Home Assistant Configuration for Gmail Summaries Service
+# Add these configurations to your Home Assistant configuration.yaml
+
+# REST Commands for Gmail Summaries
+rest_command:
+  gmail_summary_today:
+    url: "http://gmail-summaries:5000/api/summarize"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    payload: '{"query": "Summarize Today\u0027s Unread Emails"}'
+    
+  gmail_summary_kids:
+    url: "http://gmail-summaries:5000/api/summarize"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    payload: '{"query": "Summarize Unread emails for Kids activities"}'
+    
+  gmail_summary_custom:
+    url: "http://gmail-summaries:5000/api/summarize"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    payload: '{"query": "{{ query }}", "time_filter": "{{ time_filter }}", "topic_filter": "{{ topic_filter }}"}'
+
+# Sensor to track email count and summary
+sensor:
+  - platform: rest
+    name: "Gmail Summary Today"
+    resource: "http://gmail-summaries:5000/api/summarize"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    payload: '{"query": "Summarize Today\u0027s Unread Emails"}'
+    value_template: "{{ value_json.email_count }}"
+    json_attributes:
+      - summary
+      - email_count
+      - timestamp
+    scan_interval: 1800  # Update every 30 minutes
+    
+  - platform: rest
+    name: "Gmail Summary Kids"
+    resource: "http://gmail-summaries:5000/api/summarize"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    payload: '{"query": "Summarize Unread emails for Kids activities"}'
+    value_template: "{{ value_json.email_count }}"
+    json_attributes:
+      - summary
+      - email_count
+      - timestamp
+    scan_interval: 1800  # Update every 30 minutes
+
+# Automation Examples
+automation:
+  # Morning email summary notification
+  - alias: "Morning Email Summary"
+    description: "Send morning email summary at 8 AM"
+    trigger:
+      - platform: time
+        at: "08:00:00"
+    action:
+      - service: rest_command.gmail_summary_today
+        data: {}
+      - delay: "00:00:05"  # Wait for response
+      - service: notify.mobile_app
+        data:
+          title: "📧 Morning Email Summary"
+          message: "{{ state_attr('sensor.gmail_summary_today', 'summary') }}"
+    mode: single
+    
+  # Kids activities email check (after school)
+  - alias: "Afternoon Kids Email Check"
+    description: "Check for kids activities emails at 3 PM"
+    trigger:
+      - platform: time
+        at: "15:00:00"
+    condition:
+      - condition: state
+        entity_id: binary_sensor.school_day  # Replace with your school day sensor
+        state: "on"
+    action:
+      - service: rest_command.gmail_summary_kids
+        data: {}
+      - delay: "00:00:05"
+      - service: notify.mobile_app
+        data:
+          title: "🧒 Kids Activities Update"
+          message: "{{ state_attr('sensor.gmail_summary_kids', 'summary') }}"
+    mode: single
+    
+  # Voice assistant integration
+  - alias: "Email Summary via Voice"
+    description: "Get email summary when asked via voice assistant"
+    trigger:
+      - platform: conversation
+        command:
+          - "What are my emails today"
+          - "Summarize my emails"
+          - "Check my inbox"
+    action:
+      - service: rest_command.gmail_summary_today
+        data: {}
+      - delay: "00:00:05"
+      - service: tts.google_translate_say
+        data:
+          entity_id: media_player.living_room_speaker
+          message: "{{ state_attr('sensor.gmail_summary_today', 'summary') }}"
+    mode: single
+
+# Dashboard Card Example (Lovelace)
+# Add this to your dashboard in ui-lovelace.yaml or via UI
+
+# type: entities
+# title: 📧 Email Summaries
+# entities:
+#   - entity: sensor.gmail_summary_today
+#     name: Today's Emails
+#     secondary_info: last-changed
+#   - entity: sensor.gmail_summary_kids
+#     name: Kids Activities
+#     secondary_info: last-changed
+# show_header_toggle: false
+
+# Or use a custom card for better display:
+# type: markdown
+# title: 📧 Today's Email Summary
+# content: |
+#   **{{ states('sensor.gmail_summary_today') }} unread emails**
+#   
+#   {{ state_attr('sensor.gmail_summary_today', 'summary') }}
+#   
+#   _Last updated: {{ state_attr('sensor.gmail_summary_today', 'timestamp') }}_
+
+# Script for custom queries
+script:
+  get_email_summary:
+    alias: "Get Email Summary"
+    description: "Get custom email summary with filters"
+    fields:
+      query:
+        description: "Natural language query"
+        example: "Summarize my unread work emails"
+      time_filter:
+        description: "Time filter (today, week, or leave empty)"
+        example: "today"
+      topic_filter:
+        description: "Topic to filter by"
+        example: "work"
+    sequence:
+      - service: rest_command.gmail_summary_custom
+        data:
+          query: "{{ query }}"
+          time_filter: "{{ time_filter | default('') }}"
+          topic_filter: "{{ topic_filter | default('') }}"
+      - delay: "00:00:05"
+      - service: notify.persistent_notification
+        data:
+          title: "Email Summary"
+          message: "{{ state_attr('sensor.gmail_summary_today', 'summary') }}"
